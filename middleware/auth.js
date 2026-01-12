@@ -7,7 +7,16 @@ module.exports = function (req, res, next) {
     return res.status(401).json({ error: 'Token requerido' });
   }
 
-  const token = authHeader.split(' ')[1];
+  // Validar formato "Bearer token"
+  if (!authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Formato de token inválido' });
+  }
+
+  const token = authHeader.substring(7);
+
+  if (!token) {
+    return res.status(401).json({ error: 'Token requerido' });
+  }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
