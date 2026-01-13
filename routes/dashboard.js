@@ -105,7 +105,7 @@ router.get('/', async (req, res) => {
 // ======================================
 router.post('/', async (req, res) => {
   try {
-    const { fecha, caja, debito, transferencias, agua, alquiler, sueldos, varios } = req.body;
+    const { fecha, caja, debito, transferencias, agua = 0, alquiler = 0, sueldos = 0, varios = 0 } = req.body;
 
     const fechaDate = new Date(fecha);
     fechaDate.setUTCHours(0, 0, 0, 0);
@@ -116,9 +116,9 @@ router.post('/', async (req, res) => {
 
     const nuevaVenta = new Venta({
       fecha: fechaDate,
-      caja,
-      debito,
-      transferencias,
+      caja: caja || 0,
+      debito: debito || 0,
+      transferencias: transferencias || 0,
       agua,
       alquiler,
       sueldos,
