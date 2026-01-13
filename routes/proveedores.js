@@ -4,6 +4,31 @@ const Proveedor = require('../models/Proveedor');
 const GastoProveedor = require('../models/GastoProveedor');
 
 // ================================
+// Inicializar "Adelanto caja" si no existe
+// ================================
+router.post('/init-adelanto-caja', async (req, res) => {
+  try {
+    const existe = await Proveedor.findOne({ esAdelantoCaja: true });
+
+    if (existe) {
+      return res.json({ message: 'Adelanto caja ya existe', proveedor: existe });
+    }
+
+    const adelantoCaja = new Proveedor({
+      nombre: 'Adelanto caja',
+      esAdelantoCaja: true
+    });
+
+    await adelantoCaja.save();
+    res.status(201).json({ message: 'Adelanto caja creado', proveedor: adelantoCaja });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al inicializar Adelanto caja' });
+  }
+});
+
+// ================================
 // Obtener todos los proveedores
 // ================================
 router.get('/', async (req, res) => {
@@ -46,6 +71,18 @@ router.post('/', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const proveedorId = req.params.id;
+
+    // Verificar si es "Adelanto caja" (protegido)
+    const proveedor = await Proveedor.findById(proveedorId);
+    if (!proveedor) {
+      return res.status(404).json({ message: 'Proveedor no encontrado' });
+    }
+
+    if (proveedor.esAdelantoCaja) {
+      return res.status(400).json({
+        message: 'No se puede eliminar "Adelanto caja" porque es un proveedor protegido del sistema'
+      });
+    }
 
     const tieneGastos = await GastoProveedor.exists({ proveedor: proveedorId });
     if (tieneGastos) {

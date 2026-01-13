@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
     const hastaDate = new Date(`${hasta}T23:59:59.999Z`);
 
     const ventas = await Venta.find({ fecha: { $gte: desdeDate, $lte: hastaDate } }).sort({ fecha: -1 });
-    const gastosProv = await GastoProveedor.find({ fecha: { $gte: desdeDate, $lte: hastaDate } });
+    const gastosProv = await GastoProveedor.find({ fecha: { $gte: desdeDate, $lte: hastaDate } }).populate('proveedor');
 
     const resumen = {};
     const fechaLocalStr = (fecha) => {
@@ -39,6 +39,7 @@ router.get('/', async (req, res) => {
         ventaTotal: 0,
         proveedoresEfectivo: 0,
         proveedoresTransferencia: 0,
+        proveedoresEfectivoSinAdelanto: 0,
         agua: v.agua || 0,
         alquiler: v.alquiler || 0,
         sueldos: v.sueldos || 0,
@@ -59,13 +60,23 @@ router.get('/', async (req, res) => {
           ventaTotal: 0,
           proveedoresEfectivo: 0,
           proveedoresTransferencia: 0,
+          proveedoresEfectivoSinAdelanto: 0,
           agua: 0,
           alquiler: 0,
           sueldos: 0,
           varios: 0
         };
       }
-      if (g.tipo === 'EFECTIVO') resumen[dia].proveedoresEfectivo += g.monto || 0;
+
+      const esAdelantoCaja = g.proveedor?.esAdelantoCaja || false;
+
+      if (g.tipo === 'EFECTIVO') {
+        resumen[dia].proveedoresEfectivo += g.monto || 0;
+        // Solo sumar al cálculo de venta efectivo si NO es "Adelanto caja"
+        if (!esAdelantoCaja) {
+          resumen[dia].proveedoresEfectivoSinAdelanto += g.monto || 0;
+        }
+      }
       if (g.tipo === 'TRANSFERENCIA') resumen[dia].proveedoresTransferencia += g.monto || 0;
     });
 
@@ -76,7 +87,8 @@ router.get('/', async (req, res) => {
     );
 
     resumenFinal.forEach(r => {
-      r.ventaEfectivo += r.proveedoresEfectivo || 0;
+      // Usar proveedoresEfectivoSinAdelanto para el cálculo de venta efectivo
+      r.ventaEfectivo += r.proveedoresEfectivoSinAdelanto || 0;
       r.ventaTotal = (r.ventaEfectivo || 0) + (r.debito || 0) + (r.transferencias || 0);
     });
 
@@ -164,6 +176,56 @@ router.delete('/ventas/:id', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error al eliminar venta' });
+  }
+});
+
+// ======================================
+// Balance de Caja Histórico Total
+// ======================================
+router.get('/balance-caja', async (req, res) => {
+  try {
+    // Obtener TODAS las ventas (sin filtro de fecha)
+    const ventas = await Venta.find();
+
+    // Obtener TODOS los gastos de proveedores (sin filtro de fecha)
+    const gastosProv = await GastoProveedor.find().populate('proveedor');
+
+    // Calcular total de ventas en efectivo (excluyendo adelanto caja)
+    let totalVentasEfectivo = 0;
+
+    ventas.forEach(v => {
+      totalVentasEfectivo += (v.caja || 0) + (v.agua || 0) + (v.alquiler || 0) + (v.sueldos || 0) + (v.varios || 0);
+    });
+
+    // Sumar gastos de proveedores efectivo (excluyendo adelanto caja)
+    gastosProv.forEach(g => {
+      const esAdelantoCaja = g.proveedor?.esAdelantoCaja || false;
+      if (g.tipo === 'EFECTIVO' && !esAdelantoCaja) {
+        totalVentasEfectivo += g.monto || 0;
+      }
+    });
+
+    // Calcular total de proveedores efectivo (INCLUYENDO adelanto caja)
+    let totalProveedoresEfectivo = 0;
+
+    gastosProv.forEach(g => {
+      if (g.tipo === 'EFECTIVO') {
+        totalProveedoresEfectivo += g.monto || 0;
+      }
+    });
+
+    // Balance = Ventas Efectivo - Proveedores Efectivo
+    const balanceCaja = totalVentasEfectivo - totalProveedoresEfectivo;
+
+    res.json({
+      totalVentasEfectivo,
+      totalProveedoresEfectivo,
+      balanceCaja
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Error al calcular balance de caja' });
   }
 });
 

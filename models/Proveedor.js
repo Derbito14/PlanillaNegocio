@@ -6,6 +6,10 @@ const proveedorSchema = new mongoose.Schema({
     required: true,
     unique: true,
     trim: true
+  },
+  esAdelantoCaja: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true
