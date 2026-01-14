@@ -4,27 +4,43 @@ const Proveedor = require('../models/Proveedor');
 const GastoProveedor = require('../models/GastoProveedor');
 
 // ================================
-// Inicializar "Adelanto caja" si no existe
+// Inicializar todos los adelantos protegidos
 // ================================
 router.post('/init-adelanto-caja', async (req, res) => {
   try {
-    const existe = await Proveedor.findOne({ esAdelantoCaja: true });
+    // Lista de todos los adelantos protegidos
+    const adelantosProtegidos = [
+      { nombre: 'Adelanto caja', esAdelantoCaja: true },
+      { nombre: 'Adelanto pescado', esProveedorProtegido: true },
+      { nombre: 'Adelanto pollo', esProveedorProtegido: true },
+      { nombre: 'Adelanto carne', esProveedorProtegido: true },
+      { nombre: 'Adelanto personal', esProveedorProtegido: true }
+    ];
 
-    if (existe) {
-      return res.json({ message: 'Adelanto caja ya existe', proveedor: existe });
+    const creados = [];
+    const yaExistentes = [];
+
+    for (const adelanto of adelantosProtegidos) {
+      const existe = await Proveedor.findOne({ nombre: adelanto.nombre });
+
+      if (!existe) {
+        const nuevoAdelanto = new Proveedor(adelanto);
+        await nuevoAdelanto.save();
+        creados.push(adelanto.nombre);
+      } else {
+        yaExistentes.push(adelanto.nombre);
+      }
     }
 
-    const adelantoCaja = new Proveedor({
-      nombre: 'Adelanto caja',
-      esAdelantoCaja: true
+    res.json({
+      message: 'Adelantos inicializados correctamente',
+      creados,
+      yaExistentes
     });
-
-    await adelantoCaja.save();
-    res.status(201).json({ message: 'Adelanto caja creado', proveedor: adelantoCaja });
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: 'Error al inicializar Adelanto caja' });
+    res.status(500).json({ message: 'Error al inicializar adelantos protegidos' });
   }
 });
 
@@ -72,18 +88,20 @@ router.delete('/:id', async (req, res) => {
   try {
     const proveedorId = req.params.id;
 
-    // Verificar si es "Adelanto caja" (protegido)
+    // Verificar si el proveedor existe
     const proveedor = await Proveedor.findById(proveedorId);
     if (!proveedor) {
       return res.status(404).json({ message: 'Proveedor no encontrado' });
     }
 
-    if (proveedor.esAdelantoCaja) {
+    // Verificar si es un proveedor protegido del sistema
+    if (proveedor.esAdelantoCaja || proveedor.esProveedorProtegido) {
       return res.status(400).json({
-        message: 'No se puede eliminar "Adelanto caja" porque es un proveedor protegido del sistema'
+        message: `No se puede eliminar "${proveedor.nombre}" porque es un proveedor protegido del sistema`
       });
     }
 
+    // Verificar si tiene gastos registrados
     const tieneGastos = await GastoProveedor.exists({ proveedor: proveedorId });
     if (tieneGastos) {
       return res.status(400).json({

@@ -10,6 +10,10 @@ const proveedorSchema = new mongoose.Schema({
   esAdelantoCaja: {
     type: Boolean,
     default: false
+  },
+  esProveedorProtegido: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true
