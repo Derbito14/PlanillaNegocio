@@ -68,12 +68,12 @@ router.get('/', async (req, res) => {
         };
       }
 
-      const esAdelantoCaja = g.proveedor?.esAdelantoCaja || false;
+      const esAdelanto = g.proveedor?.esAdelantoCaja || g.proveedor?.esProveedorProtegido || false;
 
       if (g.tipo === 'EFECTIVO') {
         resumen[dia].proveedoresEfectivo += g.monto || 0;
-        // Solo sumar al cálculo de venta efectivo si NO es "Adelanto caja"
-        if (!esAdelantoCaja) {
+        // Solo sumar al cálculo de venta efectivo si NO es un adelanto
+        if (!esAdelanto) {
           resumen[dia].proveedoresEfectivoSinAdelanto += g.monto || 0;
         }
       }
@@ -197,10 +197,10 @@ router.get('/balance-caja', async (req, res) => {
       totalVentasEfectivo += (v.caja || 0) + (v.agua || 0) + (v.alquiler || 0) + (v.sueldos || 0) + (v.varios || 0);
     });
 
-    // Sumar gastos de proveedores efectivo (excluyendo adelanto caja)
+    // Sumar gastos de proveedores efectivo (excluyendo todos los adelantos)
     gastosProv.forEach(g => {
-      const esAdelantoCaja = g.proveedor?.esAdelantoCaja || false;
-      if (g.tipo === 'EFECTIVO' && !esAdelantoCaja) {
+      const esAdelanto = g.proveedor?.esAdelantoCaja || g.proveedor?.esProveedorProtegido || false;
+      if (g.tipo === 'EFECTIVO' && !esAdelanto) {
         totalVentasEfectivo += g.monto || 0;
       }
     });
